@@ -21,7 +21,27 @@ const commands = [
                 type:3,
             }
         ]
-    }
+    },
+    {
+        name:"join",
+        description: "listen the moan of the femboy"
+    },
+    {
+        name:"begone",
+        description: "Banish the femboy from voice channel"
+    },
+    {
+        name:"play",
+        description: "play a song",
+        options:[
+            {
+                name:"source",
+                description:"name or link",
+                type:3,
+                required:true,
+            }
+        ]
+    },
 ]
 
 const rest = new REST({version:"10"}).setToken(process.env.CLIENT_TOKEN);
