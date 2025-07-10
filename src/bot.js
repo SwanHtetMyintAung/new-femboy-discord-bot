@@ -3,7 +3,7 @@ const {Client, GatewayIntentBits, IntentsBitField } = require("discord.js");
 const { joinVoiceChannel,getVoiceConnection, VoiceConnectionStatus, entersState, AudioPlayer, createAudioPlayer } = require('@discordjs/voice');
 
 //modules
-const { playYouTubeAudio } = require("./stream-audio.js")
+const streamManager = require("./stream-audio.js")
 //another way of creating intents
 const botIntents = new IntentsBitField();
 botIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages,)
@@ -52,8 +52,13 @@ femboy.on("interactionCreate",async (interaction)=>{
             await interaction.reply("Miku isn’t just a Vocaloid, she’s a lifestyle. We don’t just simp—we praise her. Every note she sings feels like a blessing straight from the digital heavens. Thursdays are officially reserved for thanking Miku, because in Miku we trust, and through autotune, we ascend. ");
             break;
         case "symbol":
-            SYMBOL = interaction.options.getString("symbol") || SYMBOL;
-            await interaction.reply(`current symbol is "${SYMBOL}"`);
+            try {
+                SYMBOL = interaction.options.getString("symbol") || SYMBOL;
+                await interaction.reply(`current symbol is "${SYMBOL}"`);
+            } catch (error) {
+                console.log("Error on Changing Symbol",error)
+                await interaction.reply("Oh no something went wrong! Check The Logs Pls");
+            }
             break;
         case "join":
             const voiceChannel = interaction.member.voice.channel;
@@ -63,7 +68,7 @@ femboy.on("interactionCreate",async (interaction)=>{
             }
             try {
                 let existingConnection = getVoiceConnection(interaction.guild.id);
-                console.log(existingConnection)
+                await interaction.deferReply()
                 if(existingConnection){
                     if(existingConnection.joinConfig.channelId === voiceChannel.id){
                         await interaction.reply("I am already with you BAKA ٩◔̯◔۶");
@@ -101,33 +106,48 @@ femboy.on("interactionCreate",async (interaction)=>{
             }
 
 
-            await interaction.reply("I'll let you enjoy the show!")
+            await interaction.editReply("I'll let you enjoy the show!")
             break;
         case "play":{   
-            const connection = getVoiceConnection(interaction.guild.id);
-            if(!connection){
-                await interaction.reply("I have to be in a channel first.");
-                return;
+            try {
+                const connection = getVoiceConnection(interaction.guild.id);
+                if(!connection){
+                    await interaction.reply("I have to be in a channel first.");
+                    return;
+                }
+                const player = createAudioPlayer();
+                if(!player){
+                    console.log("Couldn't create audio player");
+                    return;
+                }
+                await interaction.deferReply();
+                //value will be the link or the name for the command
+                const {value} = interaction.options.get("source");
+                const {title,duration_string} = await getVideoInfo(value);
+                //discord has time out 3 second . we need to  edit the reply to get around it
+                await interaction.editReply(`Added ${title} to the queue with duration of ${duration_string}`);
+                InitateQueue(connection,player);
+                await addToQueue(interaction,value)
+                
+            } catch (error) {
+                console.log("Error on  Playing song : ",error);
+                await interaction.reply("Oh no something went wrong! Check The Logs Pls");
             }
-            const player = createAudioPlayer();
-            if(!player){
-                console.log("Couldn't create audio player");
-                return;
-            }
-            //value will be the link or the name for the command
-            const {value} = interaction.options.get("source");
-            console.log(url);
-            await playYouTubeAudio(connection,player,value);
             break;
         }
         case "begone":
-            const connection = getVoiceConnection(interaction.guild.id);
-            if(!connection){
-                await interaction.reply("I am not in any voice channels tho.");
-            }else{
-                //delete and get out of vc
-                connection.destroy();
-                await interaction.reply("Jaa Ne (ゝз○`)");
+            try{
+                const connection = getVoiceConnection(interaction.guild.id);
+                if(!connection){
+                    await interaction.reply("I am not in any voice channels tho.");
+                }else{
+                    //delete and get out of vc
+                    connection.destroy();
+                    await interaction.reply("Jaa Ne (ゝз○`)");
+                }
+            }catch(error){
+                console.log("error on leaving voice channel : ", error)
+                await interaction.reply("Oh no something went wrong! Check The Logs Pls");
             }
             break;
         default:

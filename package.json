@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/bot.js",
   "scripts": {
-    "start":"node src/register-cmd.js && node src/bot.js",
+    "start": "node src/register-cmd.js && node src/bot.js",
     "dev": "node src/register-cmd.js && nodemon bot.js"
   },
   "keywords": [],
@@ -11,10 +11,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@discordjs/opus": "^0.10.0",
     "@discordjs/voice": "^0.18.0",
     "discord.js": "^14.20.0",
     "dotenv": "^16.5.0",
     "libsodium-wrappers": "^0.7.15",
-    "ytdl-core": "^4.11.5"
+    "ytdlp-nodejs": "^2.3.0"
   }
 }
