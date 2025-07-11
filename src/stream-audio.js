@@ -38,25 +38,15 @@ function initializeMusicStream(textChannel,voiceChannel,connection,player){
     ServerQueue.player.on("error",(error)=>{
         console.log("Error with in the music player : ", error.message);
         ServerQueue.textChannel.send("There was an erorr playing current song. Skipping to next.");
-
-        // ServerQueue.songs.shift();
-        // if(ServerQueue.songs.length <= 0){
-        //     ServerQueue.textChannel.send("Since there is no more songs to play, I'll be leaving.");
-        //     ServerQueue.connection.destroy();
-         
-        // }else{
-        //     playSong(ServerQueue.songs[0])//simply play the song for now
-        // }
         ServerQueue.player.stop();
 
     })
 }
 async function getVideoInfo(url){
     const info = await ytdlp.getInfoAsync(url);
-    
     return {
         title: info.title,
-        duraion:info.duration,
+        duration:info.duration_string,
         url: url
     }
 }
@@ -96,25 +86,29 @@ function playSong(song){
     }
 
     try {
+
         const ytdlpProcess = ytdlp.exec(url,{
             format:"bestaudio",
             output:"-"
         })
-        ytdlpProcess.stderr.on("data", data => {
-            console.error(`yt-dlp error: ${data}`);
-        });
+        // debug
+        // ytdlpProcess.stderr.on("data", data => {
+        //     console.error(`yt-dlp error: ${data}`);
+        // });
         if(!ytdlpProcess.stdout){
             console.error("Error! yt-dlp didn't return any std output.");
         }
         const resource = createAudioResource(ytdlpProcess.stdout,{
-            inputType: StreamType.Arbitrary,
+            inputType: StreamType.Arbitrary,//change this to Opus along with exec format to 251 to optimize
             inlineVolume: true
         })
         resource.volume.setVolume(0.75)
         ServerQueue.player.play(resource);
+        ServerQueue.connection.subscribe(ServerQueue.player)
+        ServerQueue.playing = true;//this is for pause and resume
+
         console.log(`playing ${title} now`)
         ServerQueue.textChannel.send(`${title} is playing right now`)
-        ServerQueue.connection.subscribe(ServerQueue.player)
     } catch (error) {
        console.log("Error on Creating Music Stream - ", error.message);
        ServerQueue.textChannel.send("couldn't create the stream. Tehee")
@@ -153,6 +147,15 @@ function getQueue(){
 function getPlayer(){
     return ServerQueue.player;
 }
+function resetServerQueue(){
+    ServerQueue.textChannel = null,
+    ServerQueue.voiceChannel=null,
+    ServerQueue.connection=null,
+    ServerQueue.player=null,
+    ServerQueue.songs=[],
+    ServerQueue.volume=1,
+    ServerQueue.playing=false
+}
 module.exports ={
     initializeMusicStream,
     getVideoInfo,
@@ -161,38 +164,7 @@ module.exports ={
     pauseSong,
     resumeSong,
     getQueue,
-    getPlayer
+    getPlayer,
+    resetServerQueue
 }
-
-//for testing purposes
-
-async function test(url){
-    const writeStream = fs.createWriteStream(__dirname+"/test.m3u8")
-    const ytdlpProcess =  ytdlp.exec(url,{
-        format:"bestaudio",
-        filter:"audioonly",
-        output:"-",
-        audioFormat:"mp3"
-    });
-    
-    if(!ytdlpProcess.stdout) {
-        console.log("No std out put");
-        return;
-    }
-    ytdlpProcess.stdout.pipe(writeStream)
-    writeStream.on("error",(error)=>{
-        console.log(error)
-    })
-    ytdlpProcess.stdout.on("end",(code)=>{
-        console.log(`finished with ${code}`)
-        writeStream.close()
-    })
-    ytdlpProcess.stderr.on('data', (data) => {
-
-        console.error(`yt-dlp STDERR: ${data.toString()}`);
-    });
-    
-}
-// test("https://youtu.be/FZUcpVmEHuk?si=fw1hYrIcxm-drisq")
-// .then(()=>console.log("The stream is finished"))
-// .catch((error)=>console.log(error))
+getVideoInfo("https://youtu.be/4Gx0leVhzV4?si=mm_9AT7JYcI9cw8l")
