@@ -1,6 +1,6 @@
 require("dotenv").config()
 const {Client, GatewayIntentBits, IntentsBitField } = require("discord.js");
-const { joinVoiceChannel,getVoiceConnection, VoiceConnectionStatus, entersState, AudioPlayer, createAudioPlayer } = require('@discordjs/voice');
+const { joinVoiceChannel,getVoiceConnection, VoiceConnectionStatus, entersState, AudioPlayer, createAudioPlayer, } = require('@discordjs/voice');
 
 //modules
 const streamManager = require("./stream-audio.js")
@@ -33,6 +33,15 @@ femboy.on("messageCreate",async (message)=>{
         case "chit-lrr?":
             await message.reply("Chit tl");
             break;
+        case "pause":
+            streamManager.pauseSong();
+            break;
+        case "resume":
+            streamManager.resumeSong();
+            break;   
+        case "skip":
+            streamManager.skipSong();
+            break;   
         default:
             await message.reply("There is no such command yet!");
             break;
@@ -84,8 +93,16 @@ femboy.on("interactionCreate",async (interaction)=>{
                         guildId: voiceChannel.guild.id,
                         adapterCreator: voiceChannel.guild.voiceAdapterCreator,
                     });    
-                    connection.on(VoiceConnectionStatus.Ready,()=>{
+                    connection.once(VoiceConnectionStatus.Ready,()=>{
                         console.log("ready to rock in ", voiceChannel.name || "");
+                        const player = createAudioPlayer();
+                        //necessary for the other functions to work
+                        streamManager.initializeMusicStream(
+                            interaction.channel,
+                            interaction.member.voice.channel,
+                            connection,
+                            player);
+                        
                     })
                     connection.on(VoiceConnectionStatus.Disconnected,async (oldState,newState)=>{
                         try{
@@ -110,24 +127,27 @@ femboy.on("interactionCreate",async (interaction)=>{
             break;
         case "play":{   
             try {
+                await interaction.deferReply();//to convine discord that we are not disconnected (time out problem)
                 const connection = getVoiceConnection(interaction.guild.id);
                 if(!connection){
                     await interaction.reply("I have to be in a channel first.");
                     return;
                 }
-                const player = createAudioPlayer();
+                const player = streamManager.getPlayer();
                 if(!player){
-                    console.log("Couldn't create audio player");
-                    return;
+                    streamManager.initializeMusicStream(
+                        interaction.channel,
+                        interaction.member.voice.channel,
+                        connection,
+                        player);
                 }
-                await interaction.deferReply();
                 //value will be the link or the name for the command
                 const {value} = interaction.options.get("source");
-                const {title,duration_string} = await getVideoInfo(value);
+                const {title,duration,url}= await streamManager.getVideoInfo(value)
+                streamManager.addToQueue(value);
                 //discord has time out 3 second . we need to  edit the reply to get around it
-                await interaction.editReply(`Added ${title} to the queue with duration of ${duration_string}`);
-                InitateQueue(connection,player);
-                await addToQueue(interaction,value)
+                await interaction.editReply(`A song is added.`)
+                
                 
             } catch (error) {
                 console.log("Error on  Playing song : ",error);

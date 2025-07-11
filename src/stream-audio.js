@@ -1,7 +1,7 @@
 const { createAudioResource, StreamType,VoiceConnectionStatus, AudioPlayerStatus } = require('@discordjs/voice');
 const { TextChannel, VoiceChannel } = require('discord.js');
 const {YtDlp} = require('ytdlp-nodejs');
-
+const fs=require("fs");
 const ytdlp = new YtDlp();
 
 const ServerQueue = {
@@ -53,10 +53,11 @@ function initializeMusicStream(textChannel,voiceChannel,connection,player){
 }
 async function getVideoInfo(url){
     const info = await ytdlp.getInfoAsync(url);
+    
     return {
         title: info.title,
-        duraion:info.duration_string,
-        url: info.url
+        duraion:info.duration,
+        url: url
     }
 }
 
@@ -80,32 +81,39 @@ async function addToQueue(videoUrl){
 }
 
 function playSong(song){
-    const {title,duration,url} = song;
+    if(!song) return;
+    const {title , duration, url} = song;
     if(!title && !duration && !url){
         ServerQueue.textChannel.send("Something was missing");
         !title && console.log("title was missing");
         !duration && console.log("duration was missing");
         !url && console.log("url was missing");
+        return;
+    }
+    if (!ServerQueue || !ServerQueue.player || !ServerQueue.connection || !ServerQueue.textChannel) {
+        console.error("ServerQueue or its components are not set.");
+        return;
     }
 
     try {
-        const ytdlpProcess = ytdlp.exec([
-            url,
-            '-f','bestaudio',
-            '-o','-',
-            '--no-playlist',
-            '--quiet',
-        ])
+        const ytdlpProcess = ytdlp.exec(url,{
+            format:"bestaudio",
+            output:"-"
+        })
+        ytdlpProcess.stderr.on("data", data => {
+            console.error(`yt-dlp error: ${data}`);
+        });
         if(!ytdlpProcess.stdout){
             console.error("Error! yt-dlp didn't return any std output.");
         }
         const resource = createAudioResource(ytdlpProcess.stdout,{
-            metadata:{
-                name: title,
-                url:url,
-            }
+            inputType: StreamType.Arbitrary,
+            inlineVolume: true
         })
+        resource.volume.setVolume(0.75)
         ServerQueue.player.play(resource);
+        console.log(`playing ${title} now`)
+        ServerQueue.textChannel.send(`${title} is playing right now`)
         ServerQueue.connection.subscribe(ServerQueue.player)
     } catch (error) {
        console.log("Error on Creating Music Stream - ", error.message);
@@ -142,7 +150,9 @@ function resumeSong(){
 function getQueue(){
     return ServerQueue.songs;
 }
-
+function getPlayer(){
+    return ServerQueue.player;
+}
 module.exports ={
     initializeMusicStream,
     getVideoInfo,
@@ -150,5 +160,39 @@ module.exports ={
     skipSong,
     pauseSong,
     resumeSong,
-    getQueue
+    getQueue,
+    getPlayer
 }
+
+//for testing purposes
+
+async function test(url){
+    const writeStream = fs.createWriteStream(__dirname+"/test.m3u8")
+    const ytdlpProcess =  ytdlp.exec(url,{
+        format:"bestaudio",
+        filter:"audioonly",
+        output:"-",
+        audioFormat:"mp3"
+    });
+    
+    if(!ytdlpProcess.stdout) {
+        console.log("No std out put");
+        return;
+    }
+    ytdlpProcess.stdout.pipe(writeStream)
+    writeStream.on("error",(error)=>{
+        console.log(error)
+    })
+    ytdlpProcess.stdout.on("end",(code)=>{
+        console.log(`finished with ${code}`)
+        writeStream.close()
+    })
+    ytdlpProcess.stderr.on('data', (data) => {
+
+        console.error(`yt-dlp STDERR: ${data.toString()}`);
+    });
+    
+}
+// test("https://youtu.be/FZUcpVmEHuk?si=fw1hYrIcxm-drisq")
+// .then(()=>console.log("The stream is finished"))
+// .catch((error)=>console.log(error))
