@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: femboy-bot
+    env: node
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      npm install # or pip install, bundle install, etc.
+    startCommand: node src/bot.js

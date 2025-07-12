@@ -104,20 +104,20 @@ femboy.on("interactionCreate",async (interaction)=>{
             }
             break;
         case "join":
+            await interaction.deferReply()
             const voiceChannel = interaction.member.voice.channel;
             if(!voiceChannel){
-                await interaction.reply("You can't expect me to go there alone (⚆ᗝ⚆)");
+                await interaction.editReply("You can't expect me to go there alone (⚆ᗝ⚆)");
                 return;
             }
             try {
                 let existingConnection = getVoiceConnection(interaction.guild.id);
-                await interaction.deferReply()
                 if(existingConnection){
                     if(existingConnection.joinConfig.channelId === voiceChannel.id){
-                        await interaction.reply("I am already with you BAKA ٩◔̯◔۶");
+                        await interaction.editReply("I am already with you BAKA ٩◔̯◔۶");
                         return;
                     }else{
-                        await interaction.reply("I don't know the shadow clone jutsu TwT");
+                        await interaction.editReply("I don't know the shadow clone jutsu TwT");
                         return;
                     }
                 }else{//no precursor connection
@@ -125,30 +125,28 @@ femboy.on("interactionCreate",async (interaction)=>{
                     SetupNewConnection(interaction)
                 }
         
+                await interaction.editReply("I'll let you enjoy the show!")
             } catch (error) {
-                await interaction.reply("HELPPP I CAN'T JOIN THE VOICE CHANNEL%$^!&");
+                await interaction.editReply("HELPPP I CAN'T JOIN THE VOICE CHANNEL%$^!&");
                 console.log("error on joining channel : ",error)
             }
         
         
-            await interaction.editReply("I'll let you enjoy the show!")
             break;
         case "play":{   
             try {
                 await interaction.deferReply();//to convine discord that we are not disconnected (time out problem)
                 const connection = getVoiceConnection(interaction.guild.id);
-                if(connection){
-                    const player = streamManager.getPlayer();
-                    if(!player){
-                        streamManager.initializeMusicStream(
-                            interaction.channel,
-                            interaction.member.voice.channel,
-                            connection,
-                            player);
-                        }
+                if(!connection){
+                    await interaction.editReply("I have to be in a voice channel first.");
+                    return;
                 }
-                //create  a whole new setup of player and connection if there is none
-                SetupNewConnection(interaction);
+                const player = streamManager.getPlayer();     
+                streamManager.initializeMusicStream(
+                    interaction.channel,
+                    interaction.member.voice.channel,
+                    connection,
+                    player);
                 //value will be the link or the name for the command
                 const {value} = interaction.options.get("source");
                 const {title,duration,url}= await streamManager.getVideoInfo(value)
@@ -159,7 +157,7 @@ femboy.on("interactionCreate",async (interaction)=>{
                 
             } catch (error) {
                 console.log("Error on  Playing song : ",error);
-                await interaction.editReply("Oh no something went wrong! Check The Logs Pls");
+                interaction.channel.send("Oh no something went wrong! Check The Logs Pls");
             }
             break;
         }
@@ -187,34 +185,38 @@ femboy.on("interactionCreate",async (interaction)=>{
 
 async function SetupNewConnection(interaction){
     const voiceChannel = interaction.member.voice.channel;
+    try{
+        const connection = joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: voiceChannel.guild.id,
+            adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+        });    
+        connection.once(VoiceConnectionStatus.Ready,()=>{
+            console.log("ready to rock in ", voiceChannel.name || "");
+            const player = createAudioPlayer();
+            //necessary for the other functions to work
+            streamManager.initializeMusicStream(
+                interaction.channel,
+                interaction.member.voice.channel,
+                connection,
+                player);
+            
+        })
+        connection.on(VoiceConnectionStatus.Disconnected,async (oldState,newState)=>{
+            try{
+                await Promise.race([
+                    entersState(connection,VoiceConnectionStatus.Connecting,5000),
+                    entersState(connection,VoiceConnectionStatus.Signalling,5000),
+                ])
+            }catch(error){
+                interaction.channel.send("I am so lonely. I'm gonna go （◞‸◟）")
+                connection.destroy();
+            }
+        })
 
-    const connection = joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId: voiceChannel.guild.id,
-        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-    });    
-    connection.once(VoiceConnectionStatus.Ready,()=>{
-        console.log("ready to rock in ", voiceChannel.name || "");
-        const player = createAudioPlayer();
-        //necessary for the other functions to work
-        streamManager.initializeMusicStream(
-            interaction.channel,
-            interaction.member.voice.channel,
-            connection,
-            player);
-        
-    })
-    connection.on(VoiceConnectionStatus.Disconnected,async (oldState,newState)=>{
-        try{
-            await Promise.race([
-                entersState(connection,VoiceConnectionStatus.Connecting,5000),
-                entersState(connection,VoiceConnectionStatus.Signalling,5000),
-            ])
-        }catch(error){
-            interaction.channel.send("I am so lonely. I'm gonna go （◞‸◟）")
-            connection.destroy();
-        }
-    })
+    }catch(error){
+        console.log(error)
+    }
 }
 
 femboy.on("ready",(client)=>{
