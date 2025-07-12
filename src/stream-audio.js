@@ -2,7 +2,7 @@ const { createAudioResource, StreamType,VoiceConnectionStatus, AudioPlayerStatus
 const { TextChannel, VoiceChannel } = require('discord.js');
 const {YtDlp} = require('ytdlp-nodejs');
 const fs=require("fs");
-const ytdlp = new YtDlp();
+let ytdlp;
 
 const ServerQueue = {
     textChannel : null,
@@ -20,6 +20,8 @@ function initializeMusicStream(textChannel,voiceChannel,connection,player){
     ServerQueue.voiceChannel = voiceChannel;
     ServerQueue.connection = connection;
     ServerQueue.player = player;
+
+    ytdlp = new YtDlp();
     /*****************************The Events for the connection and Music player******************************** */
     //event for when a song ends or stops
     ServerQueue.player.on(AudioPlayerStatus.Idle, ()=>{
@@ -43,6 +45,7 @@ function initializeMusicStream(textChannel,voiceChannel,connection,player){
     })
 }
 async function getVideoInfo(url){
+    if(!ytdlp) return
     const info = await ytdlp.getInfoAsync(url);
     return {
         title: info.title,
@@ -71,7 +74,7 @@ async function addToQueue(videoUrl){
 }
 
 function playSong(song){
-    if(!song) return;
+    if(!song && !ytdlp) return;
     const {title , duration, url} = song;
     if(!title && !duration && !url){
         ServerQueue.textChannel.send("Something was missing");

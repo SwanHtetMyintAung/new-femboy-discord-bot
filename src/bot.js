@@ -145,7 +145,7 @@ femboy.on("interactionCreate",async (interaction)=>{
                         }
                 }
                 //create  a whole new setup of player and connection if there is none
-                await SetupNewConnection(interaction);
+                SetupNewConnection(interaction);
                 //value will be the link or the name for the command
                 const {value} = interaction.options.get("source");
                 const {title,duration,url}= await streamManager.getVideoInfo(value)
