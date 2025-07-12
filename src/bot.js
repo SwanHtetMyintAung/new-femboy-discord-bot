@@ -1,10 +1,13 @@
 require("dotenv").config()
 const {Client, GatewayIntentBits, IntentsBitField, EmbedBuilder } = require("discord.js");
 const { joinVoiceChannel,getVoiceConnection, VoiceConnectionStatus, entersState, AudioPlayer, createAudioPlayer, } = require('@discordjs/voice');
+const express = require("express");
+const app = express();
+require("dotenv").config();
+
 
 //modules
 const streamManager = require("./stream-audio.js")
-const {keepAlive} = require("../server.js")
 //another way of creating intents
 const botIntents = new IntentsBitField();
 botIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages,)
@@ -215,9 +218,14 @@ async function SetupNewConnection(interaction){
 }
 
 femboy.on("ready",(client)=>{
-    keepAlive();
     console.log(`Login as ${client.user.username}`);
 })
 
-femboy.login(process.env.CLIENT_TOKEN)
+app.all("/",(req,res)=>{
+    res.send("All is Well")
+})
+app.listen(process.env.PORT || 3000,(req,res)=>{
+    console.log("Shit is Running.")
+    femboy.login(process.env.CLIENT_TOKEN)
+})
 
